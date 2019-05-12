@@ -106,6 +106,11 @@ public class xdrip extends Application {
         }
         Reminder.firstInit(xdrip.getAppContext());
         PluggableCalibration.invalidateCache();
+
+        Bugfender.init(this, "gxWYxdUwQA3eZ0YDYbEBDYu6V1FzjmzB", BuildConfig.DEBUG);
+        Bugfender.enableCrashReporting();
+        Bugfender.enableUIEventLogging(this);
+        Bugfender.enableLogcatLogging();
     }
 
     public synchronized static void initCrashlytics(Context context) {

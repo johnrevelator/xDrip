@@ -51,6 +51,7 @@ import com.eveningoutpost.dexdrip.Models.Tomato;
 import com.eveningoutpost.dexdrip.Models.TransmitterData;
 import com.eveningoutpost.dexdrip.Models.UserError;
 import com.eveningoutpost.dexdrip.Models.UserError.Log;
+import com.eveningoutpost.dexdrip.Models.Watlaa;
 import com.eveningoutpost.dexdrip.Models.blueReader;
 import com.eveningoutpost.dexdrip.R;
 import com.eveningoutpost.dexdrip.UtilityModels.Blukon;
@@ -315,6 +316,9 @@ public class DexCollectionService extends Service implements BtCallBack {
     }
 
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
+
+
+
         @Override
         public synchronized void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             final PowerManager.WakeLock wl = JoH.getWakeLock("bluetooth-gatt", 60000);
@@ -496,7 +500,8 @@ public class DexCollectionService extends Service implements BtCallBack {
                         status("Enabled blueReader");
                         Log.d(TAG, "blueReader initialized and Version requested");
                         sendBtMessage(blueReader.initialize());
-                    } else if (Tomato.isTomato()) {
+                    }
+                    if (Tomato.isTomato()) {
                         status("Enabled tomato");
                         Log.d(TAG, "Queueing Tomato initialization..");
                         Inevitable.task("initialize-tomato", 4000, new Runnable() {
@@ -512,6 +517,12 @@ public class DexCollectionService extends Service implements BtCallBack {
                         });
 
                         servicesDiscovered = DISCOVERED.NULL; // reset this state
+                    }else if(Watlaa.isWatlaa()){
+                        status("Enabled watlaa");
+                        Log.d(TAG, "Queueing Watlaa initialization..");
+                        WatlaaCommandService.start_service(Watlaa.getWatlaaAdress());
+
+                        servicesDiscovered = DISCOVERED.NULL;
                     }
                 }
             }
@@ -674,7 +685,7 @@ public class DexCollectionService extends Service implements BtCallBack {
                 final byte[] data = characteristic.getValue();
 
                 if (data != null && data.length > 0) {
-                    setSerialDataToTransmitterRawData(data, data.length);
+                    setSerialDataToTransmitterRawData(data, data.length,characteristic.getUuid());
 
                     final String hexdump = HexDump.dumpHexString(data);
                     //if (!hexdump.contains("0x00000000 00      ")) {
@@ -739,7 +750,7 @@ public class DexCollectionService extends Service implements BtCallBack {
 
     @SuppressLint("ObsoleteSdkInt")
     private static boolean shouldServiceRun() {
-        if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR2) return false;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR2) return false;
         final boolean result = (DexCollectionType.hasXbridgeWixel() || DexCollectionType.hasBtWixel())
                 && ((!Home.get_forced_wear() && (((UiModeManager) xdrip.getAppContext().getSystemService(UI_MODE_SERVICE)).getCurrentModeType() != Configuration.UI_MODE_TYPE_WATCH))
                 || PersistentStore.getBoolean(CollectionServiceStarter.pref_run_wear_collector));
@@ -835,6 +846,8 @@ public class DexCollectionService extends Service implements BtCallBack {
             return "BlueReader";
         } else if (static_use_nrf && Tomato.isTomato()) {
             return xdrip.getAppContext().getString(R.string.tomato);
+        } else if (static_use_nrf && Watlaa.isWatlaa()) {
+            return xdrip.getAppContext().getString(R.string.watlaa);
         } else if (static_use_blukon) {
             return xdrip.getAppContext().getString(R.string.blukon);
         } else if (static_use_transmiter_pl_bluetooth) {
@@ -909,6 +922,10 @@ public class DexCollectionService extends Service implements BtCallBack {
 
         if (static_use_nrf && Tomato.isTomato()) {
             l.add(new StatusItem("Hardware", xdrip.getAppContext().getString(R.string.tomato)));
+        }
+
+        if (static_use_nrf && Watlaa.isWatlaa()) {
+            l.add(new StatusItem("Hardware", xdrip.getAppContext().getString(R.string.watlaa)));
         }
 
         // TODO add LimiTTer info
@@ -1028,6 +1045,12 @@ public class DexCollectionService extends Service implements BtCallBack {
             l.add(new StatusItem("Libre SN", PersistentStore.getString("LibreSN")));
         }
 
+        if (Watlaa.isWatlaa()) {
+            l.add(new StatusItem("Watlaa Battery", PersistentStore.getString("Watlaabattery")));
+            l.add(new StatusItem("watlaa Hardware", PersistentStore.getString("WatlaaHArdware")));
+            l.add(new StatusItem("Watlaa Firmware", PersistentStore.getString("WatlaaFirmware")));
+        }
+
         if (static_use_blukon) {
             l.add(new StatusItem("Battery", Pref.getInt("bridge_battery", 0) + "%"));
             l.add(new StatusItem("Sensor age", JoH.qs(((double) Pref.getInt("nfc_sensor_age", 0)) / 1440, 1) + "d"));
@@ -1068,8 +1091,8 @@ public class DexCollectionService extends Service implements BtCallBack {
         }
 
         cloner.dontClone(
-                android.bluetooth.BluetoothDevice.class,
-                android.bluetooth.BluetoothGattService.class
+                BluetoothDevice.class,
+                BluetoothGattService.class
         );
 
         final IntentFilter pairingRequestFilter = new IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST);
@@ -1588,10 +1611,11 @@ public class DexCollectionService extends Service implements BtCallBack {
         }
     }
 
-    public synchronized void setSerialDataToTransmitterRawData(byte[] buffer, int len) {
+    public synchronized void setSerialDataToTransmitterRawData(byte[] buffer,int len,UUID uuid) {
 
         last_time_seen = JoH.tsl();
         watchdog_count = 0;
+
         if (static_use_blukon && Blukon.checkBlukonPacket(buffer)) {
             final byte[] reply = Blukon.decodeBlukonPacket(buffer);
             if (reply != null) {
@@ -1619,7 +1643,7 @@ public class DexCollectionService extends Service implements BtCallBack {
             }
             gotValidPacket();
 
-        } else if (XbridgePlus.isXbridgeExtensionPacket(buffer)) {
+        }  else if (XbridgePlus.isXbridgeExtensionPacket(buffer)) {
             // handle xBridge+ protocol packets
             final byte[] reply = XbridgePlus.decodeXbridgeExtensionPacket(buffer);
             if (reply != null) {
@@ -1775,7 +1799,7 @@ public class DexCollectionService extends Service implements BtCallBack {
                 bt_wdg_timer = MAX_BT_WDG;
             }
 
-            if ((JoH.msSince(last_time_seen)) > bt_wdg_timer*Constants.MINUTE_IN_MS) {
+            if ((JoH.msSince(last_time_seen)) > bt_wdg_timer* Constants.MINUTE_IN_MS) {
                 Log.d(TAG,"Use BT Watchdog timer=" + bt_wdg_timer);
                 if (!JoH.isOngoingCall()) {
                     Log.e(TAG, "Watchdog triggered, attempting to reset bluetooth");

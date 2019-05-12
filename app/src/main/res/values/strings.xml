@@ -1506,4 +1506,5 @@
     <string name="no_sensor_found">No sensor found</string>
     <string name="checksum_failed__retrying">Checksum failed - retrying</string>
     <string name="scanning">Scanning</string>
+    <string name="watlaa">watlaa</string>
 </resources>

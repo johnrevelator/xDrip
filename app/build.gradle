@@ -319,6 +319,9 @@ dependencies {
     compileOnly 'org.projectlombok:lombok:1.16.20'
     //  compileOnly 'javax.annotation:javax.annotation-api:1.3.2'
     annotationProcessor "org.projectlombok:lombok:1.16.20"
+
+    //LOGGING
+    implementation 'com.bugfender.sdk:android:1.+'
 }
 
 apply plugin: 'com.google.gms.google-services'
