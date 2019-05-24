@@ -21,6 +21,10 @@ import com.eveningoutpost.dexdrip.UtilityModels.Pref;
 import com.eveningoutpost.dexdrip.UtilityModels.StatusItem;
 
 import com.eveningoutpost.dexdrip.insulin.shared.ProcessPenData;
+import com.eveningoutpost.dexdrip.insulin.watlaa.messages.AdvertRx;
+import com.eveningoutpost.dexdrip.insulin.watlaa.messages.BatteryRx;
+import com.eveningoutpost.dexdrip.insulin.watlaa.messages.BondTx;
+import com.eveningoutpost.dexdrip.insulin.watlaa.messages.KeepAliveTx;
 import com.eveningoutpost.dexdrip.insulin.watlaa.messages.RecordRx;
 import com.eveningoutpost.dexdrip.insulin.watlaa.messages.TimeRx;
 import com.eveningoutpost.dexdrip.utils.bt.Helper;
@@ -67,6 +71,8 @@ import static com.eveningoutpost.dexdrip.UtilityModels.StatusItem.Highlight.BAD;
 import static com.eveningoutpost.dexdrip.UtilityModels.StatusItem.Highlight.GOOD;
 import static com.eveningoutpost.dexdrip.UtilityModels.StatusItem.Highlight.NORMAL;
 
+import static com.eveningoutpost.dexdrip.insulin.watlaa.Watlaa.DEFAULT_BOND_UNITS;
+import static com.eveningoutpost.dexdrip.insulin.watlaa.Watlaa.STORE_WATLAA_BATTERY;
 import static com.eveningoutpost.dexdrip.utils.bt.Helper.getCharactersticName;
 
 /** jamorham
@@ -99,30 +105,22 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     private static long failover_time;
 
     {
-        mState = new InPenState().setLI(I);
+        mState = new WatlaaState().setLI(I);
         I.backgroundStepDelay = 0;
         I.autoConnect = true;
         I.autoReConnect = true; // TODO control these two from preference?
         I.playSounds = true;
         I.connectTimeoutMinutes = 25;
         I.reconnectConstraint = new SlidingWindowConstraint(30, MINUTE_IN_MS, "max_reconnections");
+        CurrentTimeService.INSTANCE.startServer(this);
         //I.resetWhenAlreadyConnected = true;
     }
 
 
-    static class InPenState extends BaseState {
-        static final String PROTOTYPE = "Prototype Test";
-        static final String GET_IDENTITY = "Get Identity";
-        static final String KEEP_ALIVE = "Keep Alive";
-        static final String BOND_AUTHORITY = "Bond Authority";
-        static final String GET_AUTH_STATE = "Get Auth";
-        static final String GET_AUTH_STATE2 = "Get Post Auth";
-        static final String BONDAGE = "Bonding";
+    static class WatlaaState extends BaseState {
+
         static final String GET_BATTERY = "Get Battery";
-        static final String GET_INDEX = "Get Index";
-        static final String GET_TIME = "Get Time";
-        static final String GET_A_TIME = "Get Attach Time";
-        static final String GET_RECORDS = "Get Records";
+
 
         {
             sequence.clear();
@@ -130,29 +128,12 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
             sequence.add(INIT);
             sequence.add(CONNECT_NOW);
             sequence.add(DISCOVER); // automatically executed
-            sequence.add(GET_IDENTITY);
-            sequence.add(GET_A_TIME);
-            sequence.add(GET_AUTH_STATE);
-            sequence.add(KEEP_ALIVE);
-            sequence.add(BOND_AUTHORITY);
-            sequence.add(BONDAGE);
-            // TODO wait for bonding to be bonded
-            sequence.add(GET_AUTH_STATE2);
-            sequence.add(SLEEP);
-            //
-            sequence.add(GET_INDEX);
-            sequence.add(GET_TIME);
             sequence.add(GET_BATTERY);
-            sequence.add(GET_RECORDS); // tends to close connection after this
             sequence.add(SLEEP);
-            //
-            sequence.add(PROTOTYPE);
-            sequence.add(SEND_QUEUE);
-            sequence.add(SLEEP);
-            //
 
         }
     }
+
 
     @Override
     protected synchronized boolean automata() {
@@ -160,7 +141,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         if (D) UserError.Log.d(TAG, "Automata called in watlaa");
         msg(I.state);
 
-        switch (I.state) {
+        /*switch (I.state) {
 
             case INIT:
                 // connect by default
@@ -203,7 +184,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
                 } else {
                     UserError.Log.d(TAG, "Service should be shut down so stopping automata");
                 }
-        }
+        }*/
         return true; // lies
     }
 
@@ -270,6 +251,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        CurrentTimeService.INSTANCE.stopServer();
         WatlaaEntry.started_at = -1;
     }
 
@@ -283,25 +265,16 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         final long missingIndex = PenData.getMissingIndex(I.address);
         if (missingIndex != -1) {
             UserError.Log.d(TAG, "Index: " + missingIndex + " is missing");
-            getRecords((int) missingIndex, (int) missingIndex);
+            //getRecords((int) missingIndex, (int) missingIndex);
             return true;
         }
         return false;
     }
 
-    private void getIndex() {
-        I.connection.readCharacteristic(RECORD_INDEX).subscribe(
-                indexValue -> {
-                    UserError.Log.d(TAG, "GetIndex result: " + dumpHexString(indexValue));
-                    lastReceivedData = JoH.tsl();
-                    I.connection.readCharacteristic(REMAINING_INDEX).subscribe(
-                            remainingValue -> indexProcessor(indexValue, remainingValue),
-                            throwable -> UserError.Log.e(TAG, "Could not read after Remaining status: " + throwable));
-                }, throwable -> UserError.Log.e(TAG, "Could not read after Index status: " + throwable));
-    }
+
 
     private void getBattary() {
-        I.connection.readCharacteristic(BATTERY_SERVICE).subscribe(
+        I.connection.readCharacteristic(Constants.BATTERY_LEVEL_CHARACTERISTIC).subscribe(
                 indexValue -> {
                     UserError.Log.d(TAG, "GetIndex result: " + dumpHexString(indexValue));
                     lastReceivedData = JoH.tsl();
@@ -317,7 +290,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     }
 
 
-    private void getTime() {
+   /* private void getTime() {
         // TODO persist epoch
         if (currentPenTime == null || ratelimit("inpen-get-time", 10000)) {
             I.connection.readCharacteristic(PEN_TIME).subscribe(
@@ -338,7 +311,8 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         }
     }
 
-
+*/
+/*
     private void getAttachTime() {
         // TODO persist attach epoch
         if (currentPenAttachTime == null || ratelimit("inpen-get-time", 180000)) {
@@ -366,16 +340,17 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
             changeNextState();
         }
     }
+*/
 
 
     private void getBattery() {
-        if (JoH.pratelimit("inpen-battery-poll-" + I.address, 40000)) {
-            I.connection.readCharacteristic(BATTERY).subscribe(
+        if (JoH.pratelimit("watlaa-battery-poll-" + I.address, 40000)) {
+            I.connection.readCharacteristic(Constants.BATTERY_LEVEL_CHARACTERISTIC).subscribe(
                     batteryValue -> {
                         final BatteryRx battery = new BatteryRx().fromBytes(batteryValue);
                         if (battery != null) {
                             lastBattery = battery.getBatteryPercent();
-                            PersistentStore.setLong(STORE_INPEN_BATTERY + I.address, lastBattery);
+                            PersistentStore.setLong(STORE_WATLAA_BATTERY+ I.address, lastBattery);
                             UserError.Log.d(TAG, "GetBattery result: " + battery.getBatteryPercent());
                             changeNextState();
                         } else {
@@ -391,7 +366,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         } else {
             UserError.Log.d(TAG, "Skipping battery read");
             if (lastBattery == -1) {
-                lastBattery = (int) PersistentStore.getLong(STORE_INPEN_BATTERY + I.address);
+                lastBattery = (int) PersistentStore.getLong(STORE_WATLAA_BATTERY + I.address);
                 if (lastBattery == 0) {
                     lastBattery = -1;
                 } else {
@@ -428,7 +403,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
             UserError.Log.d(TAG, "Restricting first index to: " + firstIndex);
         }
 
-        getRecords(firstIndex, lastIndex);
+       // getRecords(firstIndex, lastIndex);
     }
 
 
@@ -440,7 +415,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
             if (record != null) {
                 final RecordRx recordRx = new RecordRx(currentPenTime).fromBytes(record);
                 if (recordRx != null) {
-                    UserError.Log.d(TAG, "RECORD RECORD: " + recordRx.toS());
+                    /*UserError.Log.d(TAG, "RECORD RECORD: " + recordRx.toS());
                     final PenData penData = PenData.create(I.address, ID_INPEN, recordRx.index, recordRx.units, recordRx.getRealTimeStamp(), recordRx.temperature, record);
                     if (penData == null) {
                         UserError.Log.wtf(TAG, "Error creating PenData record from " + HexDump.dumpHexString(record));
@@ -452,11 +427,11 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
                         newRecord = true;
                         gotIndex = (int) penData.index;
                         gotAll = lastIndex == gotIndex;
-                        if (InPen.soundsEnabled() && JoH.ratelimit("pen_data_in", 1)) {
+                        if (Watlaa.soundsEnabled() && JoH.ratelimit("pen_data_in", 1)) {
                             JoH.playResourceAudio(R.raw.bt_meter_data_in);
                         }
                         lastPenData = penData;
-                    }
+                    }*/
                 } else {
                     UserError.Log.e(TAG, "Error creating record from: " + HexDump.dumpHexString(record));
                 }
@@ -467,38 +442,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         }
     }
 
-    private void keepAlive() {
-        I.connection.writeCharacteristic(KEEPALIVE, new KeepAliveTx().getBytes()).subscribe(
-                value -> {
-                    UserError.Log.d(TAG, "Sent KeepAlive ok: ");
-                    changeNextState();
-                }, throwable -> {
-                    UserError.Log.e(TAG, "Could not write keepAlive " + throwable);
-                });
-    }
 
-    private void bondAuthority() {
-        final AdvertRx adv = new AdvertRx().fromBytes(PersistentStore.getBytes(STORE_INPEN_ADVERT + I.address));
-        if (adv != null) {
-            final float bondUnits = JoH.roundFloat((float) Pref.getStringToDouble("inpen_prime_units", DEFAULT_BOND_UNITS), 1);
-            final BondTx btx = new BondTx(bondUnits, adv.getFlagBytes());
-            I.connection.writeCharacteristic(BONDCONTROL, btx.getBytes()).subscribe(
-                    value -> {
-                        UserError.Log.d(TAG, "Sent BondAuthority ok: " + bytesToHex(value));
-                        changeNextState();
-                    }, throwable -> {
-                        if (isErrorResponse(throwable)) {
-                            // user dialed up the wrong number of units!
-                            err("Cannot bond with pen as incorrect number of units dialed up for pairing. Should be " + bondUnits + " or other error");
-                            bondAsRequired(false);
-                        } else {
-                            UserError.Log.e(TAG, "Could not write BondAuthority " + throwable);
-                        }
-                    });
-        } else {
-            err("Cannot find valid scan record for: " + I.address);
-        }
-    }
 
     @TargetApi(Build.VERSION_CODES.KITKAT)
     private void bondAsRequired(final boolean wait) {
@@ -554,7 +498,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     static final List<UUID> huntCharacterstics = new ArrayList<>();
 
     static {
-        huntCharacterstics.add(Constants.BATTERY); // specimen TODO improve
+        huntCharacterstics.add(Constants.BATTERY_LEVEL_CHARACTERISTIC); // specimen TODO improve
     }
 
     @Override
@@ -618,7 +562,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         UserError.Log.wtf(TAG, msg);
     }
 
-
+/*
     // data for MegaStatus
     public static List<StatusItem> megaStatus() {
         final List<StatusItem> l = new ArrayList<>();
@@ -674,7 +618,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         if (result != null) {
             l.add(new StatusItem(name, result));
         }
-    }
+    }*/
 
     private static String getCharacteristicString(final UUID uuid) {
         if (staticCharacteristics == null) return null;
