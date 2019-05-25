@@ -8,6 +8,8 @@ buildscript {
     }
 }
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android-extensions'
+apply plugin: 'kotlin-android'
 //apply plugin: 'me.tatarka.retrolambda'
 //apply plugin: 'io.fabric'
 
@@ -322,6 +324,7 @@ dependencies {
 
     //LOGGING
     implementation 'com.bugfender.sdk:android:1.+'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 }
 
 apply plugin: 'com.google.gms.google-services'

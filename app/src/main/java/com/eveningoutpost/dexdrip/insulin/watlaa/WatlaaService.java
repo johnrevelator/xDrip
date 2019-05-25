@@ -13,67 +13,43 @@ import com.eveningoutpost.dexdrip.ImportedLibraries.usbserial.util.HexDump;
 import com.eveningoutpost.dexdrip.Models.JoH;
 import com.eveningoutpost.dexdrip.Models.PenData;
 import com.eveningoutpost.dexdrip.Models.UserError;
-import com.eveningoutpost.dexdrip.R;
 import com.eveningoutpost.dexdrip.Services.JamBaseBluetoothSequencer;
 import com.eveningoutpost.dexdrip.UtilityModels.Inevitable;
 import com.eveningoutpost.dexdrip.UtilityModels.PersistentStore;
 import com.eveningoutpost.dexdrip.UtilityModels.Pref;
-import com.eveningoutpost.dexdrip.UtilityModels.StatusItem;
-
 import com.eveningoutpost.dexdrip.insulin.shared.ProcessPenData;
-import com.eveningoutpost.dexdrip.insulin.watlaa.messages.AdvertRx;
 import com.eveningoutpost.dexdrip.insulin.watlaa.messages.BatteryRx;
-import com.eveningoutpost.dexdrip.insulin.watlaa.messages.BondTx;
-import com.eveningoutpost.dexdrip.insulin.watlaa.messages.KeepAliveTx;
 import com.eveningoutpost.dexdrip.insulin.watlaa.messages.RecordRx;
 import com.eveningoutpost.dexdrip.insulin.watlaa.messages.TimeRx;
 import com.eveningoutpost.dexdrip.utils.bt.Helper;
 import com.eveningoutpost.dexdrip.utils.framework.WakeLockTrampoline;
 import com.eveningoutpost.dexdrip.utils.math.Converters;
 import com.eveningoutpost.dexdrip.utils.time.SlidingWindowConstraint;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import com.polidea.rxandroidble.RxBleDeviceServices;
-import com.polidea.rxandroidble.exceptions.BleDisconnectedException;
 import com.polidea.rxandroidble.exceptions.BleGattCharacteristicException;
 import com.polidea.rxandroidble.exceptions.BleGattException;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 
-import rx.schedulers.Schedulers;
-
 import static android.bluetooth.BluetoothDevice.BOND_BONDED;
 import static android.bluetooth.BluetoothDevice.BOND_NONE;
 import static com.eveningoutpost.dexdrip.ImportedLibraries.usbserial.util.HexDump.dumpHexString;
-import static com.eveningoutpost.dexdrip.Models.JoH.bytesToHex;
-import static com.eveningoutpost.dexdrip.Models.JoH.dateTimeText;
 import static com.eveningoutpost.dexdrip.Models.JoH.emptyString;
 import static com.eveningoutpost.dexdrip.Models.JoH.hourMinuteString;
 import static com.eveningoutpost.dexdrip.Models.JoH.msSince;
 import static com.eveningoutpost.dexdrip.Models.JoH.quietratelimit;
-import static com.eveningoutpost.dexdrip.Models.JoH.ratelimit;
 import static com.eveningoutpost.dexdrip.Services.JamBaseBluetoothSequencer.BaseState.CLOSE;
 import static com.eveningoutpost.dexdrip.Services.JamBaseBluetoothSequencer.BaseState.INIT;
 import static com.eveningoutpost.dexdrip.UtilityModels.Constants.INPEN_SERVICE_FAILOVER_ID;
 import static com.eveningoutpost.dexdrip.UtilityModels.Constants.MINUTE_IN_MS;
 import static com.eveningoutpost.dexdrip.UtilityModels.Constants.SECOND_IN_MS;
-import static com.eveningoutpost.dexdrip.UtilityModels.StatusItem.Highlight.BAD;
-import static com.eveningoutpost.dexdrip.UtilityModels.StatusItem.Highlight.GOOD;
-import static com.eveningoutpost.dexdrip.UtilityModels.StatusItem.Highlight.NORMAL;
-
-import static com.eveningoutpost.dexdrip.insulin.watlaa.Watlaa.DEFAULT_BOND_UNITS;
 import static com.eveningoutpost.dexdrip.insulin.watlaa.Watlaa.STORE_WATLAA_BATTERY;
-import static com.eveningoutpost.dexdrip.utils.bt.Helper.getCharactersticName;
+import static com.eveningoutpost.dexdrip.insulin.watlaa.WatlaaService.WatlaaState.GET_BATTERY;
 
 /** jamorham
  *
@@ -117,7 +93,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     }
 
 
-    static class WatlaaState extends BaseState {
+    static class WatlaaState extends JamBaseBluetoothSequencer.BaseState {
 
         static final String GET_BATTERY = "Get Battery";
 
@@ -141,7 +117,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         if (D) UserError.Log.d(TAG, "Automata called in watlaa");
         msg(I.state);
 
-        /*switch (I.state) {
+        switch (I.state) {
 
             case INIT:
                 // connect by default
@@ -150,42 +126,17 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
             case GET_BATTERY:
                 getBattery();
                 break;
-            case GET_A_TIME:
-                getAttachTime();
-                break;
-            case GET_TIME:
-                getTime();
-                break;
-            case GET_RECORDS:
-                getRecords();
-                break;
-            case KEEP_ALIVE:
-                keepAlive();
-                break;
-            case BOND_AUTHORITY:
-                bondAuthority();
-                break;
-            case BONDAGE:
-                bondAsRequired(true);
-                break;
-            case GET_AUTH_STATE:
-            case GET_AUTH_STATE2:
-                getAuthState();
-                break;
-            case GET_INDEX:
-                getIndex();
-                break;
             default:
                 if (shouldServiceRun()) {
                     if (msSince(lastReceivedData) < MINUTE_IN_MS) {
-                        Inevitable.task("inpen-set-failover", 1000, this::setFailOverTimer);
+                        Inevitable.task("watlaa-set-failover", 1000, this::setFailOverTimer);
                     }
                     return super.automata();
                 } else {
                     UserError.Log.d(TAG, "Service should be shut down so stopping automata");
                 }
-        }*/
-        return true; // lies
+        }
+        return true;
     }
 
 

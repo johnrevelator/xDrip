@@ -656,6 +656,7 @@
         <service android:name=".watch.lefun.LeFunService" />
         <service android:name=".cgm.nsfollow.NightscoutFollowService" />
         <service android:name=".insulin.inpen.InPenService" />
+        <service android:name=".insulin.watlaa.WatlaaService" />
 
         <activity
             android:name=".EventLogActivity"

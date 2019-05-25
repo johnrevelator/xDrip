@@ -10,6 +10,7 @@ import android.preference.PreferenceManager;
 import android.support.annotation.StringRes;
 import android.util.Log;
 
+import com.bugfender.sdk.Bugfender;
 import com.crashlytics.android.Crashlytics;
 import com.crashlytics.android.core.CrashlyticsCore;
 import com.eveningoutpost.dexdrip.Models.AlertType;
