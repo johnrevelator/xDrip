@@ -13,6 +13,7 @@ import java.util.Calendar
 import java.util.UUID
 
 import android.content.Context.BLUETOOTH_SERVICE
+import android.util.Log
 
 
 object CurrentTimeService {
@@ -57,6 +58,8 @@ object CurrentTimeService {
 
     fun startServer(context: Context): Boolean {
         if (sGattServer == null) {
+            Log.d("MyLog", "CTS started")
+
             val manager = context.getSystemService(BLUETOOTH_SERVICE) as BluetoothManager
             val callback = CurrentTimeCallback()
             sGattServer = manager.openGattServer(context, callback)
@@ -65,8 +68,19 @@ object CurrentTimeService {
             }
             sGattServer!!.addService(GATT_SERVICE)
             callback.setGattServer(sGattServer!!)
-        }
+        } else
+            restartServer(context)
         return true
+    }
+
+    fun restartServer(context: Context){
+        if(sGattServer!=null)
+            try {
+                stopServer()
+            } catch (e:Exception){
+
+            }
+        startServer(context)
     }
 
 

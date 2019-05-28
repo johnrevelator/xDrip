@@ -75,6 +75,7 @@ import com.eveningoutpost.dexdrip.Models.Sensor;
 import com.eveningoutpost.dexdrip.Models.StepCounter;
 import com.eveningoutpost.dexdrip.Models.Treatments;
 import com.eveningoutpost.dexdrip.Models.UserError;
+import com.eveningoutpost.dexdrip.Models.Watlaa;
 import com.eveningoutpost.dexdrip.Services.ActivityRecognizedService;
 import com.eveningoutpost.dexdrip.Services.DexCollectionService;
 import com.eveningoutpost.dexdrip.Services.Ob1G5CollectionService;
@@ -111,6 +112,7 @@ import com.eveningoutpost.dexdrip.databinding.PopupInitialStatusHelperBinding;
 import com.eveningoutpost.dexdrip.eassist.EmergencyAssistActivity;
 import com.eveningoutpost.dexdrip.insulin.inpen.InPenEntry;
 import com.eveningoutpost.dexdrip.insulin.pendiq.Pendiq;
+import com.eveningoutpost.dexdrip.insulin.watlaa.WatlaaEntry;
 import com.eveningoutpost.dexdrip.languageeditor.LanguageEditor;
 import com.eveningoutpost.dexdrip.profileeditor.DatePickerFragment;
 import com.eveningoutpost.dexdrip.profileeditor.ProfileAdapter;
@@ -1027,6 +1029,8 @@ public class Home extends ActivityWithMenu implements ActivityCompat.OnRequestPe
                 });
             } else if (bundle.getString("inpen-reset") != null) {
                 InPenEntry.startWithReset();
+            } else if (bundle.getString("watlaa-reset") != null) {
+                WatlaaEntry.startWithReset();
             } else if (bundle.getString(Home.BLOOD_TEST_ACTION) != null) {
                 Log.d(TAG, "BLOOD_TEST_ACTION");
                 final AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -1884,6 +1888,7 @@ public class Home extends ActivityWithMenu implements ActivityCompat.OnRequestPe
             @Override
             public void run() {
                 InPenEntry.startIfEnabled();
+                WatlaaEntry.startIfEnabled();
                 EmergencyAssistActivity.checkPermissionRemoved();
                 NightscoutUploader.launchDownloadRest();
                 Pendiq.immortality(); // Experimental testing phase

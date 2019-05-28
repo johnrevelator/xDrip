@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothGattService;
 import android.content.Intent;
 import android.os.Build;
 import android.os.PowerManager;
+import android.util.Log;
 
 import com.eveningoutpost.dexdrip.ImportedLibraries.usbserial.util.HexDump;
 import com.eveningoutpost.dexdrip.Models.JoH;
@@ -66,6 +67,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     private static TimeRx currentPenAttachTime = null; // TODO hashmap for multiple pens?
     private int lastIndex = -1; // TODO hashmap for multiple pens? Use storage object for each pen??
     private int gotIndex = -2; // TODO hashmap for multiple pens? Use storage object for each pen??
+    protected String TAG = this.getClass().getSimpleName();
 
     private static volatile String lastState = "None";
     private static volatile String lastError = null;
@@ -88,7 +90,6 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         I.playSounds = true;
         I.connectTimeoutMinutes = 25;
         I.reconnectConstraint = new SlidingWindowConstraint(30, MINUTE_IN_MS, "max_reconnections");
-        CurrentTimeService.INSTANCE.startServer(this);
         //I.resetWhenAlreadyConnected = true;
     }
 
@@ -124,6 +125,8 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
                 changeNextState();
                 break;
             case GET_BATTERY:
+                Log.d("MyLog", "Getting battery");
+
                 getBattery();
                 break;
             default:
@@ -144,6 +147,8 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     public int onStartCommand(Intent intent, int flags, int startId) {
 
         final PowerManager.WakeLock wl = JoH.getWakeLock("watlaa service", 60000);
+        CurrentTimeService.INSTANCE.startServer(this);
+
         try {
             WatlaaEntry.started_at = JoH.tsl();
             UserError.Log.d(TAG, "WAKE UP WAKE UP WAKE UP");
@@ -169,10 +174,12 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
                                     JoH.static_toast_long("Searching for Watlaa");
                                     Watlaa.setMac("");
                                     WatlaaEntry.startWithRefresh();
+                                    CurrentTimeService.INSTANCE.restartServer(this);
                                     break;
                                 case "refresh":
                                     currentPenAttachTime = null;
                                     currentPenTime = null;
+                                    CurrentTimeService.INSTANCE.restartServer(this);
                                     changeState(INIT);
                                     break;
                                 case "prototype":
@@ -298,6 +305,9 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         if (JoH.pratelimit("watlaa-battery-poll-" + I.address, 40000)) {
             I.connection.readCharacteristic(Constants.BATTERY_LEVEL_CHARACTERISTIC).subscribe(
                     batteryValue -> {
+                        Log.d(TAG, new String(batteryValue));
+                        Log.d("MyLog", new String(batteryValue));
+
                         final BatteryRx battery = new BatteryRx().fromBytes(batteryValue);
                         if (battery != null) {
                             lastBattery = battery.getBatteryPercent();

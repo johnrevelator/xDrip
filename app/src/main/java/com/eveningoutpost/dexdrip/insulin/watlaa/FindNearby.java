@@ -34,7 +34,7 @@ public class FindNearby implements BtCallBack {
             case ScanMeister.SCAN_FOUND_CALLBACK:
                 UserError.Log.e(TAG, "Found! " + mac);
                 Watlaa.setMac(mac);
-                InPenEntry.startWithRefresh();
+                WatlaaEntry.startWithRefresh();
                 if (JoH.ratelimit("found-watlaa-first-time",86000)) {
                     JoH.playResourceAudio(R.raw.labbed_musical_chime);
                 }

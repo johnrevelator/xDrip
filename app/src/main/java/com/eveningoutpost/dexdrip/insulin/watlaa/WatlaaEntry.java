@@ -18,7 +18,7 @@ public class WatlaaEntry {
     public static long started_at = -1;
 
     public static boolean isEnabled() {
-        return Pref.getBooleanDefaultFalse("watlaa_enabled");
+        return Pref.getBoolean("watlaa_enabled", true);
     }
 
     private static void startWith(final String function) {
