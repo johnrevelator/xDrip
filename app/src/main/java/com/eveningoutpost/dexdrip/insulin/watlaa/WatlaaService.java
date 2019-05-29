@@ -125,7 +125,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
                 changeNextState();
                 break;
             case GET_BATTERY:
-                Log.d("MyLog", "Getting battery");
+                Log.d("WatlaaLog", "Getting battery");
 
                 getBattery();
                 break;
@@ -305,6 +305,8 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         if (JoH.pratelimit("watlaa-battery-poll-" + I.address, 40000)) {
             I.connection.readCharacteristic(Constants.BATTERY_LEVEL_CHARACTERISTIC).subscribe(
                     batteryValue -> {
+                        Log.d("WatlaaLog", new String(batteryValue)+" battery");
+
                         Log.d(TAG, new String(batteryValue));
                         Log.d("MyLog", new String(batteryValue));
 

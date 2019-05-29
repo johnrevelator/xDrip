@@ -58,7 +58,7 @@ object CurrentTimeService {
 
     fun startServer(context: Context): Boolean {
         if (sGattServer == null) {
-            Log.d("MyLog", "CTS started")
+            Log.i("WatlaaLog", "CTS started")
 
             val manager = context.getSystemService(BLUETOOTH_SERVICE) as BluetoothManager
             val callback = CurrentTimeCallback()
