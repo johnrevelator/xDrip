@@ -32,6 +32,7 @@ import com.polidea.rxandroidble.exceptions.BleGattException;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -154,6 +155,8 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         final PowerManager.WakeLock wl = JoH.getWakeLock("watlaa service", 60000);
         CurrentTimeService.INSTANCE.startServer(this);
 
+        if (!EventBus.getDefault().isRegistered(this))
+            EventBus.getDefault().register(this);
         try {
             WatlaaEntry.started_at = JoH.tsl();
             UserError.Log.d(TAG, "WAKE UP WAKE UP WAKE UP");
@@ -213,8 +216,8 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     }
 
 
-    @Subscribe
-    public void onWtlaaEvent(WatlaaEvent watlaaEvent) {
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onWatlaaEvent(WatlaaEvent watlaaEvent) {
         switch (watlaaEvent.getType()) {
             case WatlaaEvent.CALLIBRATION:
 
@@ -231,8 +234,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     @Override
     public void onCreate() {
         super.onCreate();
-        if (!EventBus.getDefault().isRegistered(this))
-            EventBus.getDefault().register(this);
+
     }
 
     @Override
@@ -316,7 +318,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
 
     private void sendCallibrations(String value) {
         if (JoH.pratelimit("watlaa-units-get-" + I.address, 40000)) {
-            I.connection.writeCharacteristic(Constants.CALLIBRATION_SLATE_CHARACTERISTIC, new UnitTx(value.getBytes()).getBytes()).subscribe(
+            I.connection.writeCharacteristic(Constants.CALLIBRATION_SLATE_CHARACTERISTIC , new UnitTx(value.getBytes()).getBytes()).subscribe(
                     valueResponse -> {
                         UserError.Log.d(TAG, "Sent Units ok: ");
                     }, throwable -> {

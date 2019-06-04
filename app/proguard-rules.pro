@@ -113,6 +113,12 @@
     @com.google.gson.annotations.Expose *;
 }
 
+-keepattributes *Annotation*
+-keepclassmembers class ** {
+    @org.greenrobot.eventbus.Subscribe <methods>;
+}
+-keep enum org.greenrobot.eventbus.ThreadMode { *; }
+
 -dontnote rx.internal.util.PlatformDependent
 -dontnote rx.**
 -dontnote **rx.Observable.**
