@@ -14,6 +14,7 @@ import java.util.UUID
 
 import android.content.Context.BLUETOOTH_SERVICE
 import android.util.Log
+import com.eveningoutpost.dexdrip.Models.UserError
 
 
 object CurrentTimeService {
@@ -58,7 +59,7 @@ object CurrentTimeService {
 
     fun startServer(context: Context): Boolean {
         if (sGattServer == null) {
-            Log.i("WatlaaLog", "CTS started")
+            UserError.Log.d("WatlaaLog", "CTS started")
 
             val manager = context.getSystemService(BLUETOOTH_SERVICE) as BluetoothManager
             val callback = CurrentTimeCallback()

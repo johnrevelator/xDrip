@@ -54,7 +54,7 @@ public class NavDrawerBuilder {
             this.nav_drawer_intents.add(new Intent(context, CalibrationGraph.class));
         }
 
-        if (prefs.getBoolean("show_data_tables", false)) {
+        if (prefs.getBoolean("show_data_tables", true)) {
             this.nav_drawer_options.add(context.getString(R.string.bg_data_table));
             this.nav_drawer_intents.add(new Intent(context, BgReadingTable.class));
             this.nav_drawer_options.add(context.getString(R.string.calibration_data_table));

@@ -8,7 +8,6 @@ import android.bluetooth.BluetoothGattService;
 import android.content.Intent;
 import android.os.Build;
 import android.os.PowerManager;
-import android.util.Log;
 
 import com.eveningoutpost.dexdrip.ImportedLibraries.usbserial.util.HexDump;
 import com.eveningoutpost.dexdrip.Models.JoH;
@@ -22,13 +21,17 @@ import com.eveningoutpost.dexdrip.insulin.shared.ProcessPenData;
 import com.eveningoutpost.dexdrip.insulin.watlaa.messages.BatteryRx;
 import com.eveningoutpost.dexdrip.insulin.watlaa.messages.RecordRx;
 import com.eveningoutpost.dexdrip.insulin.watlaa.messages.TimeRx;
+import com.eveningoutpost.dexdrip.insulin.watlaa.messages.UnitTx;
+import com.eveningoutpost.dexdrip.insulin.watlaa.messages.WatlaaEvent;
 import com.eveningoutpost.dexdrip.utils.bt.Helper;
 import com.eveningoutpost.dexdrip.utils.framework.WakeLockTrampoline;
-import com.eveningoutpost.dexdrip.utils.math.Converters;
 import com.eveningoutpost.dexdrip.utils.time.SlidingWindowConstraint;
 import com.polidea.rxandroidble.RxBleDeviceServices;
 import com.polidea.rxandroidble.exceptions.BleGattCharacteristicException;
 import com.polidea.rxandroidble.exceptions.BleGattException;
+
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,8 +55,9 @@ import static com.eveningoutpost.dexdrip.UtilityModels.Constants.SECOND_IN_MS;
 import static com.eveningoutpost.dexdrip.insulin.watlaa.Watlaa.STORE_WATLAA_BATTERY;
 import static com.eveningoutpost.dexdrip.insulin.watlaa.WatlaaService.WatlaaState.GET_BATTERY;
 
-/** jamorham
- *
+/**
+ * jamorham
+ * <p>
  * InPen connection and data transfer service
  */
 
@@ -125,7 +129,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
                 changeNextState();
                 break;
             case GET_BATTERY:
-                Log.d("WatlaaLog", "Getting battery");
+                UserError.Log.d("WatlaaLog", "Getting battery");
 
                 getBattery();
                 break;
@@ -141,6 +145,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         }
         return true;
     }
+
 
 
     @Override
@@ -182,6 +187,8 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
                                     CurrentTimeService.INSTANCE.restartServer(this);
                                     changeState(INIT);
                                     break;
+
+
                                 case "prototype":
                                     //     changeState(PROTOTYPE);
                                     break;
@@ -206,16 +213,39 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     }
 
 
+    @Subscribe
+    public void onWtlaaEvent(WatlaaEvent watlaaEvent) {
+        switch (watlaaEvent.getType()) {
+            case WatlaaEvent.CALLIBRATION:
+
+                break;
+            case WatlaaEvent.UNITS:
+                sendUnits(watlaaEvent.getValue());
+                break;
+
+        }
+    }
+
+
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        if (!EventBus.getDefault().isRegistered(this))
+            EventBus.getDefault().register(this);
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
         CurrentTimeService.INSTANCE.stopServer();
+        if (EventBus.getDefault().isRegistered(this))
+            EventBus.getDefault().unregister(this);
         WatlaaEntry.started_at = -1;
     }
 
 
     ///// Methods
-
 
 
     // TODO make sure we don't get stuck on a bum record
@@ -230,90 +260,19 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     }
 
 
-
-    private void getBattary() {
-        I.connection.readCharacteristic(Constants.BATTERY_LEVEL_CHARACTERISTIC).subscribe(
-                indexValue -> {
-                    UserError.Log.d(TAG, "GetIndex result: " + dumpHexString(indexValue));
-                    lastReceivedData = JoH.tsl();
-                    }, throwable -> UserError.Log.e(TAG, "Could not read after Index status: " + throwable));
-    }
-
-    private void indexProcessor(final byte[] indexValue, final byte[] remainingValue) {
-        lastIndex = Converters.unsignedBytesToInt(indexValue);
-        gotAll = lastIndex == gotIndex;
-        UserError.Log.d(TAG, "Index value: " + lastIndex);
-        UserError.Log.d(TAG, "Remain value: " + Converters.unsignedBytesToInt(remainingValue));
-        changeNextState();
-    }
-
-
-   /* private void getTime() {
-        // TODO persist epoch
-        if (currentPenTime == null || ratelimit("inpen-get-time", 10000)) {
-            I.connection.readCharacteristic(PEN_TIME).subscribe(
-                    timeValue -> {
-                        UserError.Log.d(TAG, "GetTime result: " + dumpHexString(timeValue));
-                        currentPenTime = new TimeRx().fromBytes(timeValue);
-                        if (currentPenTime != null) {
-                            UserError.Log.d(TAG, "Current pen epoch: " + JoH.dateTimeText(currentPenTime.getPenEpoch()));
-                            changeNextState();
-                        } else {
-                            UserError.Log.e(TAG, "Current pen time invalid");
-                        }
-                    }, throwable -> UserError.Log.e(TAG, "Could not read after get time status: " + throwable));
-
-        } else {
-            UserError.Log.d(TAG, "Skipping get time, already have epoch");
-            changeNextState();
-        }
-    }
-
-*/
-/*
-    private void getAttachTime() {
-        // TODO persist attach epoch
-        if (currentPenAttachTime == null || ratelimit("inpen-get-time", 180000)) {
-            I.connection.readCharacteristic(PEN_ATTACH_TIME).subscribe(
-                    timeValue -> {
-                        UserError.Log.d(TAG, "GetAttachTime result: " + dumpHexString(timeValue));
-                        currentPenAttachTime = new TimeRx().fromBytes(timeValue);
-                        if (currentPenAttachTime != null) {
-                            UserError.Log.d(TAG, "Current pen attach epoch: " + currentPenAttachTime.getPenTime());
-                            changeNextState();
-                        } else {
-                            UserError.Log.e(TAG, "Current pen attach time invalid");
-                        }
-                    }, throwable -> {
-                        UserError.Log.e(TAG, "Could not read after get attach time status: " + throwable);
-                        if (throwable instanceof BleDisconnectedException) {
-                            changeState(CLOSE);
-                        } else {
-                            changeNextState();
-                        }
-                    });
-
-        } else {
-            UserError.Log.d(TAG, "Skipping get attach time, already have epoch");
-            changeNextState();
-        }
-    }
-*/
-
-
     private void getBattery() {
         if (JoH.pratelimit("watlaa-battery-poll-" + I.address, 40000)) {
             I.connection.readCharacteristic(Constants.BATTERY_LEVEL_CHARACTERISTIC).subscribe(
                     batteryValue -> {
-                        Log.d("WatlaaLog", new String(batteryValue)+" battery");
+                        UserError.Log.d("WatlaaLog", new String(batteryValue) + " battery");
 
-                        Log.d(TAG, new String(batteryValue));
-                        Log.d("MyLog", new String(batteryValue));
+                        UserError.Log.d(TAG, new String(batteryValue));
+                        UserError.Log.d("MyLog", new String(batteryValue));
 
                         final BatteryRx battery = new BatteryRx().fromBytes(batteryValue);
                         if (battery != null) {
                             lastBattery = battery.getBatteryPercent();
-                            PersistentStore.setLong(STORE_WATLAA_BATTERY+ I.address, lastBattery);
+                            PersistentStore.setLong(STORE_WATLAA_BATTERY + I.address, lastBattery);
                             UserError.Log.d(TAG, "GetBattery result: " + battery.getBatteryPercent());
                             changeNextState();
                         } else {
@@ -343,6 +302,30 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     }
 
 
+   private void sendUnits(String value) {
+        if (JoH.pratelimit("watlaa-units-get-" + I.address, 40000)) {
+            I.connection.writeCharacteristic(Constants.UNIT_CHARACTERISTIC, new UnitTx(value.getBytes()).getBytes()).subscribe(
+                    valueResponse -> {
+                        UserError.Log.d(TAG, "Sent Units ok: ");
+                    }, throwable -> {
+                        UserError.Log.e(TAG, "Could not write units " + throwable);
+                    });
+        }
+
+    }
+
+    private void sendCallibrations(String value) {
+        if (JoH.pratelimit("watlaa-units-get-" + I.address, 40000)) {
+            I.connection.writeCharacteristic(Constants.CALLIBRATION_SLATE_CHARACTERISTIC, new UnitTx(value.getBytes()).getBytes()).subscribe(
+                    valueResponse -> {
+                        UserError.Log.d(TAG, "Sent Units ok: ");
+                    }, throwable -> {
+                        UserError.Log.e(TAG, "Could not write units " + throwable);
+                    });
+        }
+
+    }
+
 
     private void getRecords() {
 
@@ -366,9 +349,8 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
             UserError.Log.d(TAG, "Restricting first index to: " + firstIndex);
         }
 
-       // getRecords(firstIndex, lastIndex);
+        // getRecords(firstIndex, lastIndex);
     }
-
 
 
     private synchronized void processRecordsQueue() {
@@ -404,7 +386,6 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
             Inevitable.task("process-inpen-data", 1000, ProcessPenData::process);
         }
     }
-
 
 
     @TargetApi(Build.VERSION_CODES.KITKAT)
@@ -604,5 +585,6 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
         }
         return null;
     }
+
 
 }
