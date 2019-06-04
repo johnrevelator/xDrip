@@ -44,6 +44,7 @@ import com.eveningoutpost.dexdrip.Services.G5CollectionService;
 import com.eveningoutpost.dexdrip.UtilityModels.CollectionServiceStarter;
 import com.eveningoutpost.dexdrip.UtilityModels.SensorStatus;
 import com.eveningoutpost.dexdrip.databinding.ActivitySystemStatusBinding;
+import com.eveningoutpost.dexdrip.insulin.watlaa.WatlaaEntry;
 import com.eveningoutpost.dexdrip.ui.MicroStatus;
 import com.eveningoutpost.dexdrip.ui.MicroStatusImpl;
 import com.eveningoutpost.dexdrip.utils.DexCollectionType;
@@ -71,6 +72,8 @@ public class SystemStatusFragment extends Fragment {
     private TextView sensor_status_view;
     private TextView transmitter_status_view;
     private TextView notes;
+    private TextView current_device_batery;
+    private LinearLayout layout_device_batery;
     private Button restart_collection_service;
     private Button forget_device;
     private Button futureDataDeleteButton;
@@ -178,7 +181,8 @@ public class SystemStatusFragment extends Fragment {
         sensor_status_view = (TextView) v.findViewById(R.id.sensor_status);
         transmitter_status_view = (TextView) v.findViewById(R.id.transmitter_status);
         current_device = (TextView) v.findViewById(R.id.remembered_device);
-
+        current_device_batery = (TextView) v.findViewById(R.id.remembered_device_batery);
+        layout_device_batery = (LinearLayout) v.findViewById(R.id.layout_device_batery);
         notes = (TextView) v.findViewById(R.id.other_notes);
 
 
@@ -303,6 +307,15 @@ public class SystemStatusFragment extends Fragment {
             current_device.setText(activeBluetoothDevice.name);
         } else {
             current_device.setText("None Set");
+            if (WatlaaEntry.isStarted()) {
+                String batery = prefs.getString("watlaa_batery", "0");
+                Log.d("BatteryLog",batery+" device battery level");
+                if (!batery.equals("0"))
+                    current_device_batery.setText(batery + "%");
+                else
+                    layout_device_batery.setVisibility(View.GONE);
+
+            }
         }
 
         String collection_method = prefs.getString("dex_collection_method", "BluetoothWixel");

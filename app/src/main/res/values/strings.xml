@@ -1507,4 +1507,5 @@
     <string name="checksum_failed__retrying">Checksum failed - retrying</string>
     <string name="scanning">Scanning</string>
     <string name="watlaa">watlaa</string>
+    <string name="bluetooth_device_batery">Bluetooth Device Battery: </string>
 </resources>

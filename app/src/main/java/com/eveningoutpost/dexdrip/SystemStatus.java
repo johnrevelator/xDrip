@@ -30,6 +30,8 @@ import com.eveningoutpost.dexdrip.Models.TransmitterData;
 import com.eveningoutpost.dexdrip.Models.UserError.Log;
 import com.eveningoutpost.dexdrip.Services.G5CollectionService;
 import com.eveningoutpost.dexdrip.UtilityModels.CollectionServiceStarter;
+import com.eveningoutpost.dexdrip.UtilityModels.Pref;
+import com.eveningoutpost.dexdrip.insulin.watlaa.WatlaaEntry;
 import com.eveningoutpost.dexdrip.utils.ActivityWithMenu;
 
 import java.lang.reflect.Method;
@@ -38,6 +40,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+
 import static com.eveningoutpost.dexdrip.xdrip.gs;
 
 public class SystemStatus extends ActivityWithMenu {
@@ -46,6 +49,8 @@ public class SystemStatus extends ActivityWithMenu {
     private TextView version_name_view;
     private TextView collection_method;
     private TextView current_device;
+    private TextView current_device_batery;
+    private LinearLayout layout_device_batery;
     private TextView connection_status;
     private TextView sensor_status_view;
     private TextView transmitter_status_view;
@@ -64,40 +69,44 @@ public class SystemStatus extends ActivityWithMenu {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_system_status);
+        Log.d("BatteryLog","levelse");
+
         JoH.fixActionBar(this);
         prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-        version_name_view = (TextView)findViewById(R.id.version_name);
-        collection_method = (TextView)findViewById(R.id.collection_method);
-        connection_status = (TextView)findViewById(R.id.connection_status);
-        sensor_status_view = (TextView)findViewById(R.id.sensor_status);
-        transmitter_status_view = (TextView)findViewById(R.id.transmitter_status);
-        current_device = (TextView)findViewById(R.id.remembered_device);
+        version_name_view = (TextView) findViewById(R.id.version_name);
+        collection_method = (TextView) findViewById(R.id.collection_method);
+        connection_status = (TextView) findViewById(R.id.connection_status);
+        sensor_status_view = (TextView) findViewById(R.id.sensor_status);
+        transmitter_status_view = (TextView) findViewById(R.id.transmitter_status);
+        current_device = (TextView) findViewById(R.id.remembered_device);
+        current_device_batery = (TextView) findViewById(R.id.remembered_device_batery);
+        layout_device_batery = (LinearLayout) findViewById(R.id.layout_device_batery);
 
-        notes = (TextView)findViewById(R.id.other_notes);
+        notes = (TextView) findViewById(R.id.other_notes);
 
-        restart_collection_service = (Button)findViewById(R.id.restart_collection_service);
-        forget_device = (Button)findViewById(R.id.forget_device);
-        refresh = (ImageButton)findViewById(R.id.refresh_current_values);
-        futureDataDeleteButton = (Button)findViewById(R.id.delete_future_data);
+        restart_collection_service = (Button) findViewById(R.id.restart_collection_service);
+        forget_device = (Button) findViewById(R.id.forget_device);
+        refresh = (ImageButton) findViewById(R.id.refresh_current_values);
+        futureDataDeleteButton = (Button) findViewById(R.id.delete_future_data);
 
         //check for small devices:
         Display display = getWindowManager().getDefaultDisplay();
         Point size = new Point();
         display.getSize(size);
         int width = size.x;
-        if(width<SMALL_SCREEN_WIDTH){
+        if (width < SMALL_SCREEN_WIDTH) {
             //adapt to small screen
-            LinearLayout layout = (LinearLayout)findViewById(R.id.layout_collectionmethod);
+            LinearLayout layout = (LinearLayout) findViewById(R.id.layout_collectionmethod);
             layout.setOrientation(LinearLayout.VERTICAL);
-            layout = (LinearLayout)findViewById(R.id.layout_version);
+            layout = (LinearLayout) findViewById(R.id.layout_version);
             layout.setOrientation(LinearLayout.VERTICAL);
-            layout = (LinearLayout)findViewById(R.id.layout_status);
+            layout = (LinearLayout) findViewById(R.id.layout_status);
             layout.setOrientation(LinearLayout.VERTICAL);
-            layout = (LinearLayout)findViewById(R.id.layout_device);
+            layout = (LinearLayout) findViewById(R.id.layout_device);
             layout.setOrientation(LinearLayout.VERTICAL);
-            layout = (LinearLayout)findViewById(R.id.layout_sensor);
+            layout = (LinearLayout) findViewById(R.id.layout_sensor);
             layout.setOrientation(LinearLayout.VERTICAL);
-            layout = (LinearLayout)findViewById(R.id.layout_transmitter);
+            layout = (LinearLayout) findViewById(R.id.layout_transmitter);
             layout.setOrientation(LinearLayout.VERTICAL);
         }
 
@@ -133,17 +142,17 @@ public class SystemStatus extends ActivityWithMenu {
 
     private void setTransmitterStatus() {
 
-        if(prefs.getString("dex_collection_method", "BluetoothWixel").equals("DexcomShare")){
+        if (prefs.getString("dex_collection_method", "BluetoothWixel").equals("DexcomShare")) {
             transmitter_status_view.setText("See Share Receiver");
             return;
         }
 
         TransmitterData td = TransmitterData.last();
 
-        if (td== null || td.sensor_battery_level == 0){
+        if (td == null || td.sensor_battery_level == 0) {
             transmitter_status_view.setText("not available");
             GcmActivity.requestSensorBatteryUpdate();
-        } else if((System.currentTimeMillis() - td.timestamp) > 1000*60*60*24){
+        } else if ((System.currentTimeMillis() - td.timestamp) > 1000 * 60 * 60 * 24) {
             transmitter_status_view.setText("no data in 24 hours");
             GcmActivity.requestSensorBatteryUpdate();
         } else {
@@ -162,9 +171,9 @@ public class SystemStatus extends ActivityWithMenu {
     }
 
 
-    private void setSensorStatus(){
-        StringBuilder sensor_status= new StringBuilder();
-        if(Sensor.isActive()){
+    private void setSensorStatus() {
+        StringBuilder sensor_status = new StringBuilder();
+        if (Sensor.isActive()) {
             Sensor sens = Sensor.currentSensor();
             Date date = new Date(sens.started_at);
             DateFormat df = new SimpleDateFormat();
@@ -182,16 +191,16 @@ public class SystemStatus extends ActivityWithMenu {
     }
 
 
-    private void setVersionName(){
+    private void setVersionName() {
         String versionName;
         try {
             versionName = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_META_DATA).versionName;
             int versionNumber = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_META_DATA).versionCode;
-            versionName += "\nCode: "+BuildConfig.buildVersion + "\nDowngradable to: "+versionNumber;
+            versionName += "\nCode: " + BuildConfig.buildVersion + "\nDowngradable to: " + versionNumber;
             version_name_view.setText(versionName);
         } catch (PackageManager.NameNotFoundException e) {
             //e.printStackTrace();
-            Log.e(this.getClass().getSimpleName(),"PackageManager.NameNotFoundException:" + e.getMessage());
+            Log.e(this.getClass().getSimpleName(), "PackageManager.NameNotFoundException:" + e.getMessage());
         }
     }
 
@@ -200,10 +209,21 @@ public class SystemStatus extends ActivityWithMenu {
     }
 
     public void setCurrentDevice() {
-        if(activeBluetoothDevice != null) {
+
+        if (activeBluetoothDevice != null) {
             current_device.setText(activeBluetoothDevice.name);
         } else {
             current_device.setText("None Set");
+
+            if (WatlaaEntry.isStarted()) {
+                String batery = prefs.getString("watlaa_batery", "0");
+                Log.d("BatteryLog",batery+" device battery level");
+                if (!batery.equals("0"))
+                    current_device_batery.setText(batery + "%");
+                else
+                    layout_device_batery.setVisibility(View.GONE);
+
+            }
         }
 
         String collection_method = prefs.getString("dex_collection_method", "BluetoothWixel");
@@ -239,9 +259,9 @@ public class SystemStatus extends ActivityWithMenu {
             connection_status.setText((JoH.qs((JoH.ts() - GcmListenerSvc.lastMessageReceived) / 60000, 0)) + " mins ago");
         }
     }
+
     private void setConnectionStatusWifiWixel() {
-        if (ParakeetHelper.isParakeetCheckingIn())
-        {
+        if (ParakeetHelper.isParakeetCheckingIn()) {
             connection_status.setText(ParakeetHelper.parakeetStatusString());
         } else {
             connection_status.setText(getApplicationContext().getString(R.string.no_data));
@@ -257,14 +277,14 @@ public class SystemStatus extends ActivityWithMenu {
                 }
             }
         }
-        if(connected) {
+        if (connected) {
             connection_status.setText(getApplicationContext().getString(R.string.connected));
         } else {
             connection_status.setText(getApplicationContext().getString(R.string.not_connected));
         }
 
         String collection_method = prefs.getString("dex_collection_method", "BluetoothWixel");
-        if(collection_method.compareTo("DexcomG5") == 0) {
+        if (collection_method.compareTo("DexcomG5") == 0) {
             Transmitter defaultTransmitter = new Transmitter(prefs.getString("dex_txid", "ABCDEF"));
             mBluetoothAdapter = mBluetoothManager.getAdapter();
             if (mBluetoothAdapter != null) {
@@ -305,9 +325,8 @@ public class SystemStatus extends ActivityWithMenu {
                     }
                 }
             }
-        } catch (NullPointerException e)
-        {
-            Log.e(TAG,"Got nullpointer exception in setNotes ",e);
+        } catch (NullPointerException e) {
+            Log.e(TAG, "Got nullpointer exception in setNotes ", e);
         }
     }
 
@@ -315,13 +334,13 @@ public class SystemStatus extends ActivityWithMenu {
         futureDataDeleteButton.setVisibility(View.GONE);
         final List<BgReading> futureReadings = BgReading.futureReadings();
         final List<Calibration> futureCalibrations = Calibration.futureCalibrations();
-        if((futureReadings != null && futureReadings.size() > 0) || (futureCalibrations != null && futureCalibrations.size() > 0)) {
+        if ((futureReadings != null && futureReadings.size() > 0) || (futureCalibrations != null && futureCalibrations.size() > 0)) {
             notes.append("\n- Your device has future data on it, Please double check the time and timezone on this phone.");
             futureDataDeleteButton.setVisibility(View.VISIBLE);
         }
         futureDataDeleteButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                if(futureReadings != null && futureReadings.size() > 0) {
+                if (futureReadings != null && futureReadings.size() > 0) {
                     for (BgReading bgReading : futureReadings) {
                         bgReading.calculated_value = 0;
                         bgReading.raw_data = 0;
@@ -329,7 +348,7 @@ public class SystemStatus extends ActivityWithMenu {
                         bgReading.save();
                     }
                 }
-                if(futureCalibrations != null && futureCalibrations.size() > 0) {
+                if (futureCalibrations != null && futureCalibrations.size() > 0) {
                     for (Calibration calibration : futureCalibrations) {
                         calibration.slope_confidence = 0;
                         calibration.sensor_confidence = 0;
@@ -364,17 +383,19 @@ public class SystemStatus extends ActivityWithMenu {
     private void forgetDeviceListener() {
         forget_device.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                if(mBluetoothManager != null && ActiveBluetoothDevice.first() != null) {
+                if (mBluetoothManager != null && ActiveBluetoothDevice.first() != null) {
                     final BluetoothAdapter bluetoothAdapter = mBluetoothManager.getAdapter();
-                    if(bluetoothAdapter != null) {
-                        for( BluetoothDevice bluetoothDevice : bluetoothAdapter.getBondedDevices()) {
-                            if(bluetoothDevice.getAddress().compareTo(ActiveBluetoothDevice.first().address) == 0) {
+                    if (bluetoothAdapter != null) {
+                        for (BluetoothDevice bluetoothDevice : bluetoothAdapter.getBondedDevices()) {
+                            if (bluetoothDevice.getAddress().compareTo(ActiveBluetoothDevice.first().address) == 0) {
                                 try {
                                     Method m = bluetoothDevice.getClass().getMethod("removeBond", (Class[]) null);
                                     m.invoke(bluetoothDevice, (Object[]) null);
                                     notes.append("\n- Bluetooth unbonded, if using share tell it to forget your device.");
                                     notes.append("\n- Scan for devices again to set connection back up!");
-                                } catch (Exception e) { Log.e("SystemStatus", e.getMessage(), e); }
+                                } catch (Exception e) {
+                                    Log.e("SystemStatus", e.getMessage(), e);
+                                }
                             }
                         }
 
@@ -398,7 +419,7 @@ public class SystemStatus extends ActivityWithMenu {
                 }
 
                 String collection_method = prefs.getString("dex_collection_method", "BluetoothWixel");
-                if(collection_method.compareTo("DexcomG5") == 0) {
+                if (collection_method.compareTo("DexcomG5") == 0) {
                     Transmitter defaultTransmitter = new Transmitter(prefs.getString("dex_txid", "ABCDEF"));
                     mBluetoothAdapter = mBluetoothManager.getAdapter();
 
@@ -415,7 +436,9 @@ public class SystemStatus extends ActivityWithMenu {
                                         Method m = device.getClass().getMethod("removeBond", (Class[]) null);
                                         m.invoke(device, (Object[]) null);
                                         notes.append("\nG5 Transmitter unbonded, switch device mode to prevent re-pairing to G5.");
-                                    } catch (Exception e) { Log.e("SystemStatus", e.getMessage(), e); }
+                                    } catch (Exception e) {
+                                        Log.e("SystemStatus", e.getMessage(), e);
+                                    }
                                 }
 
                             }

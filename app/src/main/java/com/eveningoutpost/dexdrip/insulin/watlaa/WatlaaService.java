@@ -6,8 +6,10 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.PowerManager;
+import android.preference.PreferenceManager;
 
 import com.eveningoutpost.dexdrip.ImportedLibraries.usbserial.util.HexDump;
 import com.eveningoutpost.dexdrip.Models.JoH;
@@ -88,6 +90,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     private static long failover_time;
 
     {
+
         mState = new WatlaaState().setLI(I);
         I.backgroundStepDelay = 0;
         I.autoConnect = true;
@@ -153,6 +156,8 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     public int onStartCommand(Intent intent, int flags, int startId) {
 
         final PowerManager.WakeLock wl = JoH.getWakeLock("watlaa service", 60000);
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        preferences.edit().putString("watlaa_batery","10").apply();
         CurrentTimeService.INSTANCE.startServer(this);
 
         if (!EventBus.getDefault().isRegistered(this))
@@ -267,6 +272,7 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
             I.connection.readCharacteristic(Constants.BATTERY_LEVEL_CHARACTERISTIC).subscribe(
                     batteryValue -> {
                         UserError.Log.d("WatlaaLog", new String(batteryValue) + " battery");
+                        PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).edit().putString("watlaa_batery",new String(batteryValue)).apply();
 
                         UserError.Log.d(TAG, new String(batteryValue));
                         UserError.Log.d("MyLog", new String(batteryValue));

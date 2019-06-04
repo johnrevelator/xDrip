@@ -1,6 +1,9 @@
 package com.eveningoutpost.dexdrip.insulin.watlaa;
 
 
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
+
 import com.eveningoutpost.dexdrip.Models.JoH;
 import com.eveningoutpost.dexdrip.UtilityModels.Inevitable;
 import com.eveningoutpost.dexdrip.UtilityModels.Pref;
@@ -22,6 +25,7 @@ public class WatlaaEntry {
     }
 
     private static void startWith(final String function) {
+        started_at = 1;
         Inevitable.task("watlaa-changed-" + function, 1000, () -> JoH.startService(WatlaaService.class, "function", function));
     }
 
