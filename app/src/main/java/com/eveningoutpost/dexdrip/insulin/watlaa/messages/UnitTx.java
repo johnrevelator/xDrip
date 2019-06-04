@@ -16,7 +16,7 @@ public class UnitTx extends BaseTx {
     public UnitTx(final byte[] param) {
         init(1);
         final ByteBuffer byteBuffer = ByteBuffer.wrap(param);
-        data.putInt(byteBuffer.getInt());
+        data.put(param);
     }
 
 

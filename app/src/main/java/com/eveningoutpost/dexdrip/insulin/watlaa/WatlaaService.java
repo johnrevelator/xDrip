@@ -225,9 +225,14 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
     public void onWatlaaEvent(WatlaaEvent watlaaEvent) {
         switch (watlaaEvent.getType()) {
             case WatlaaEvent.CALLIBRATION:
-
+                UserError.Log.d(TAG,watlaaEvent.getHeight().toString());
+                UserError.Log.d(TAG,watlaaEvent.getLow().toString());
+                sendHighCallibration(watlaaEvent.getHeight().toString());
+                sendLowCallibration(watlaaEvent.getLow().toString());
                 break;
             case WatlaaEvent.UNITS:
+                UserError.Log.d(TAG,watlaaEvent.getValue());
+
                 sendUnits(watlaaEvent.getValue());
                 break;
 
@@ -322,9 +327,21 @@ public class WatlaaService extends JamBaseBluetoothSequencer {
 
     }
 
-    private void sendCallibrations(String value) {
+    private void sendLowCallibration(String value) {
         if (JoH.pratelimit("watlaa-units-get-" + I.address, 40000)) {
-            I.connection.writeCharacteristic(Constants.CALLIBRATION_SLATE_CHARACTERISTIC , new UnitTx(value.getBytes()).getBytes()).subscribe(
+            I.connection.writeCharacteristic(Constants.CALLIBRATION_SLATE_CHARACTERISTIC, new UnitTx(value.getBytes()).getBytes()).subscribe(
+                    valueResponse -> {
+                        UserError.Log.d(TAG, "Sent Units ok: ");
+                    }, throwable -> {
+                        UserError.Log.e(TAG, "Could not write units " + throwable);
+                    });
+        }
+
+    }
+
+    private void sendHighCallibration(String value) {
+        if (JoH.pratelimit("watlaa-units-get-" + I.address, 40000)) {
+            I.connection.writeCharacteristic(Constants.CALLIBRATION_INTERCEPT_CHARACTERISTIC , new UnitTx(value.getBytes()).getBytes()).subscribe(
                     valueResponse -> {
                         UserError.Log.d(TAG, "Sent Units ok: ");
                     }, throwable -> {

@@ -6,10 +6,25 @@ public class WatlaaEvent {
 
     private String type;
     private String value;
+    private Double low;
+    private Double height;
 
     public WatlaaEvent(String type,String value){
         this.type=type;
         this.value=value;
+    }
+    public WatlaaEvent(String type,Double low,Double height){
+        this.type=type;
+        this.height=height;
+        this.low=low;
+    }
+
+    public Double getLow() {
+        return low;
+    }
+
+    public Double getHeight() {
+        return height;
     }
 
     public String getType() {
